@@ -1,0 +1,95 @@
+version: '3.9'
+
+networks:
+  nac-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+
+services:
+
+  # PostgreSQL
+  postgres:
+    image: postgres:18-alpine
+    container_name: nac-postgres
+    networks:
+      - nac-network
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # SQL script mount-e
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis: Canlı oturum (session) önbellekleme ve rate limit (hız sınırı) sayaçlarını hızlıca takip eder
+  redis:
+    image: redis:8-alpine
+    container_name: nac-redis
+    networks:
+      - nac-network
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Policy Engine-aaa-bcrypt
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: nac-api
+    networks:
+      - nac-network
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # FreeRADIUS 3.2: Switch, IP Telefon ve Access Point'lerden gelen Layer 2 RADIUS isteklerini alıp API'ye yönlendirir
+  freeradius:
+    build:
+      context: ./freeradius
+      dockerfile: Dockerfile
+    container_name: nac-freeradius
+    networks:
+      - nac-network
+    ports:
+      - "1812:1812/udp"
+      - "1813:1813/udp"
+    environment:
+      API_URL: http://api:8000
+      RADIUS_SECRET: ${RADIUS_SECRET}
+    depends_on:
+      api:
+        condition: service_healthy
