@@ -1,0 +1,36 @@
+rest {
+    connect_uri = "http://api:8000"
+    connect_timeout = 5.0
+    timeout = 10.0
+
+    tls {
+    }
+
+    authorize {
+        uri    = "${..connect_uri}/authorize"
+        method = 'post'
+        body   = 'json'
+        data   = '{"username": "%{User-Name}", "nas_ip": "%{NAS-IP-Address}", "calling_station_id": "%{Calling-Station-Id}"}'
+    }
+
+    authenticate {
+        uri    = "${..connect_uri}/auth"
+        method = 'post'
+        body   = 'json'
+        data   = '{"username": "%{User-Name}", "password": "%{User-Password}", "nas_ip": "%{NAS-IP-Address}", "calling_station_id": "%{Calling-Station-Id}"}'
+    }
+
+    accounting {
+        uri    = "${..connect_uri}/accounting"
+        method = 'post'
+        body   = 'json'
+        data   = '{"username": "%{User-Name}", "session_id": "%{Acct-Session-Id}", "status_type": "%{Acct-Status-Type}", "session_time": "%{Acct-Session-Time}", "input_octets": "%{Acct-Input-Octets}", "output_octets": "%{Acct-Output-Octets}", "nas_ip": "%{NAS-IP-Address}", "calling_station_id": "%{Calling-Station-Id}"}'
+    }
+
+    post-auth {
+        uri    = "${..connect_uri}/post-auth"
+        method = 'post'
+        body   = 'json'
+        data   = '{"username": "%{User-Name}", "result": "%{reply:Reply-Message}"}'
+    }
+}
