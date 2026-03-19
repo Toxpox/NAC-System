@@ -10,8 +10,8 @@ async def authorize(req: AuthorizeRequest):
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         caller = req.calling_station_id or ""
-        target = caller if is_mac_address(caller) else req.username
-        
+        target = req.username if not is_mac_address(req.username) else caller
+
         # Kullanıcının veya cihazın dahil olduğu ağ grubuna ait dinamik VLAN atamasını getirir
         if is_mac_address(target):
             row = await conn.fetchrow("""
