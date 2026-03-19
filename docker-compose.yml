@@ -1,5 +1,3 @@
-version: '3.9'
-
 networks:
   nac-network:
     driver: bridge
@@ -17,7 +15,6 @@ services:
   # PostgreSQL
   postgres:
     image: postgres:18-alpine
-    container_name: nac-postgres
     networks:
       - nac-network
     environment:
@@ -36,7 +33,6 @@ services:
   # Redis: Canlı oturum (session) önbellekleme ve rate limit (hız sınırı) sayaçlarını hızlıca takip eder
   redis:
     image: redis:8-alpine
-    container_name: nac-redis
     networks:
       - nac-network
     command: redis-server --requirepass ${REDIS_PASSWORD}
@@ -53,7 +49,6 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    container_name: nac-api
     networks:
       - nac-network
     environment:
@@ -86,7 +81,6 @@ services:
     build:
       context: ./freeradius
       dockerfile: Dockerfile
-    container_name: nac-freeradius
     networks:
       - nac-network
     ports:
