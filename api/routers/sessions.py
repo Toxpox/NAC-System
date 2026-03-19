@@ -1,54 +1,37 @@
-from fastapi import APIRouter, Query
-from database import get_db_pool
+from fastapi import APIRouter
+from typing import Optional
 from redis_client import get_all_sessions
+from database import get_db_pool
 
-router = APIRouter()
+router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
-
-@router.get("/sessions/active")
+@router.get("/active")
 async def get_active_sessions():
-    # PostgreSQL'i meşgul etmeden, yüksek hızlı Redis üzerinden bütün canlı cihaz listesini dönen endpoint
+    # Ağdaki online cihazların listesini Redis üzerinden anlık olarak getirir
     sessions = await get_all_sessions()
     return {
-        "count":    len(sessions),
+        "count": len(sessions),
         "sessions": sessions,
     }
 
-
-@router.get("/sessions/history")
-async def get_session_history(
-    username: str | None = Query(None),
-    limit:    int        = Query(50, ge=1, le=500), # Pagination (Limit) için varsayılan en fazla 500 döner
-    offset:   int        = Query(0, ge=0),          # Başlangıç kaydı (Offset)
-):
-    # Geçmişe dönük oturum (History) sorgularını veritabanından listeler
+@router.get("/history")
+async def get_session_history(username: Optional[str] = None, limit: int = 50):
+    # Geçmiş cihaz oturumlarını ve verilerini PostgreSQL (radacct) tablosundan filtreleyerek döner
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         if username:
-            # Sadece belirli bir kullanıcının geçmişini (loglarını) filtrelemek istersek
-            rows = await conn.fetch("""
-                SELECT radacctid, acctsessionid, username,
-                       nasipaddress::text, acctstarttime, acctstoptime,
-                       acctsessiontime, acctinputoctets, acctoutputoctets,
-                       callingstationid, acctstatustype
-                FROM radacct
-                WHERE username = $1
-                ORDER BY acctstarttime DESC
-                LIMIT $2 OFFSET $3
-            """, username, limit, offset)
+            query = "SELECT * FROM radacct WHERE username = $1 ORDER BY radacctid DESC LIMIT $2"
+            records = await conn.fetch(query, username, limit)
         else:
-            # Tüm sistem geçmişini görmek istersek (Dashboard vs.)
-            rows = await conn.fetch("""
-                SELECT radacctid, acctsessionid, username,
-                       nasipaddress::text, acctstarttime, acctstoptime,
-                       acctsessiontime, acctinputoctets, acctoutputoctets,
-                       callingstationid, acctstatustype
-                FROM radacct
-                ORDER BY acctstarttime DESC
-                LIMIT $1 OFFSET $2
-            """, limit, offset)
-
-    return {
-        "count":    len(rows),
-        "sessions": [dict(r) for r in rows],
-    }
+            query = "SELECT * FROM radacct ORDER BY radacctid DESC LIMIT $1"
+            records = await conn.fetch(query, limit)
+        
+        # Tarihsel veriyi JSON formatına dönüştürülebilir hale getirmek için parse işlemi
+        result = []
+        for r in records:
+            d = dict(r)
+            for k, v in d.items():
+                if hasattr(v, "isoformat"):
+                    d[k] = v.isoformat()
+            result.append(d)
+        return result

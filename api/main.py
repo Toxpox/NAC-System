@@ -1,32 +1,27 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from database import create_tables
+from database import get_db_pool, create_tables
 from seed import seed_data
-from routers import auth, authorize, accounting, users, sessions
-
+from routers import auth, authorize, accounting, sessions, users
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Uygulama başlarken veritabanı tablolarını oluşturur
+    # REST API başlatıldığında veritabanı bağlantı havuzunu ve seed(sahte veri) fonksiyonunu tetikler
+    await get_db_pool()
     await create_tables()
-    # Gerekli örnek, test verilerini (admin kullanıcısı vb.) veritabanına ekler
     await seed_data()
     yield
-    # Uygulama kapanırken eklenecek temizlik işlemleri buraya yazılabilir
 
-
-# FastAPI ana uygulamasını başlatma (Ömür döngüsü ile birlikte)
 app = FastAPI(title="NAC Policy Engine", lifespan=lifespan)
 
-# Endpointlerin (Router'ların) uygulamaya dahil edilmesi
-app.include_router(auth.router,       tags=["Authentication"])
-app.include_router(authorize.router,  tags=["Authorization"])
-app.include_router(accounting.router, tags=["Accounting"])
-app.include_router(users.router,      tags=["Users"])
-app.include_router(sessions.router,   tags=["Sessions"])
-
+# Yazılan modüler endpointlerin FastAPI'ye entegre edilmesi
+app.include_router(auth.router)
+app.include_router(authorize.router)
+app.include_router(accounting.router)
+app.include_router(sessions.router)
+app.include_router(users.router)
 
 @app.get("/health")
 async def health():
-    # Docker Compose veya orchestrator'ların uygulamanın ayakta olup olmadığını kontrol edebilmesi için basit sağlık kontrolü
+    # Docker Healtcheck mekanizması için sağlık durumu dönüşü
     return {"status": "healthy"}
