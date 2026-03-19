@@ -32,7 +32,7 @@ CREATE TABLE mac_devices (
 -- Accounting
 CREATE TABLE radacct (
     radacctid BIGSERIAL PRIMARY KEY,
-    acctsessionid VARCHAR(64) NOT NULL,
+    acctsessionid VARCHAR(64) NOT NULL UNIQUE,
     acctuniqueid VARCHAR(32),
     username VARCHAR(64) NOT NULL,
     groupname VARCHAR(64),
@@ -58,8 +58,6 @@ CREATE TABLE radacct (
     framedipaddress INET,
     acctstatustype VARCHAR(32)
 );
-
-CREATE UNIQUE INDEX idx_radacct_session ON radacct(acctsessionid);
 
 -- Başlangıç verileri
 INSERT INTO groups (group_name, vlan_id, description) VALUES
