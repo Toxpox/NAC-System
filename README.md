@@ -38,7 +38,7 @@ Docker ve Docker Compose kurulu olmalıdır.
 
 ```bash
 cp .env.example .env
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 Sistem healthcheck döngülerini tamamladıktan sonra (~15 saniye) tüm servisler `healthy` duruma geçer.
@@ -65,7 +65,7 @@ Sistem ayağa kalktığında `seed.py` aracılığıyla test verileri otomatik y
 ### PAP Doğrulama
 
 ```bash
-docker exec -i nac-freeradius radtest admin Password123! localhost 0 testing123
+docker compose exec freeradius radtest admin Password123! localhost 0 testing123
 ```
 
 Beklenen: `Access-Accept` + VLAN 10 (`Tunnel-Private-Group-Id = 10`)
@@ -74,7 +74,7 @@ Beklenen: `Access-Accept` + VLAN 10 (`Tunnel-Private-Group-Id = 10`)
 
 ```bash
 echo 'User-Name="AA:BB:CC:DD:EE:FF", Calling-Station-Id="AA:BB:CC:DD:EE:FF", NAS-IP-Address="127.0.0.1"' \
-  | docker exec -i nac-freeradius radclient localhost auth testing123
+  | docker compose exec -T freeradius radclient localhost auth testing123
 ```
 
 Beklenen: `Access-Accept` + VLAN 20
@@ -83,7 +83,7 @@ Beklenen: `Access-Accept` + VLAN 20
 
 ```bash
 for i in {1..6}; do
-  docker exec -i nac-freeradius radtest ratelimituser WrongPass localhost 0 testing123
+  docker compose exec freeradius radtest ratelimituser WrongPass localhost 0 testing123
 done
 ```
 
@@ -94,15 +94,15 @@ Beklenen: 6. denemede `Access-Reject` — `429 Too Many Requests`
 ```bash
 # Start
 echo 'Acct-Session-Id="TEST-123", User-Name="admin", Acct-Status-Type="Start", NAS-IP-Address="127.0.0.1"' \
-  | docker exec -i nac-freeradius radclient localhost acct testing123
+  | docker compose exec -T freeradius radclient localhost acct testing123
 
 # Interim-Update
 echo 'Acct-Session-Id="TEST-123", User-Name="admin", Acct-Status-Type="Interim-Update", Acct-Input-Octets=1500, Acct-Output-Octets=2500, Acct-Session-Time=300, NAS-IP-Address="127.0.0.1"' \
-  | docker exec -i nac-freeradius radclient localhost acct testing123
+  | docker compose exec -T freeradius radclient localhost acct testing123
 
 # Stop
 echo 'Acct-Session-Id="TEST-123", User-Name="admin", Acct-Status-Type="Stop", Acct-Session-Time=800, Acct-Input-Octets=2000, Acct-Output-Octets=5000, NAS-IP-Address="127.0.0.1"' \
-  | docker exec -i nac-freeradius radclient localhost acct testing123
+  | docker compose exec -T freeradius radclient localhost acct testing123
 ```
 
 Start sonrası `/sessions/active` üzerinde oturum görünür. Stop sonrası Redis'ten düşer, `/sessions/history` üzerinde nihai süreleriyle kayıtlı kalır.
@@ -114,9 +114,9 @@ Start sonrası `/sessions/active` üzerinde oturum görünür. Stop sonrası Red
 ```
 DB_NAME=radius
 DB_USER=radius
-DB_PASSWORD=RadiusPass123!
-REDIS_PASSWORD=RedisPass456!
-RADIUS_SECRET=testing123
+DB_PASSWORD=
+REDIS_PASSWORD=
+RADIUS_SECRET=
 MAX_FAILED_ATTEMPTS=5
 RATE_LIMIT_WINDOW=300
 ```
