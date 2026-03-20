@@ -30,7 +30,9 @@ RADIUS protokolünü modern bir REST API arka ucu ile birleştiren modüler bir 
 
 **MAB:** MAC adresi → `mac_devices` tablosu eşleştirmesi → VLAN ataması
 
-Ardışık başarısız girişler Redis üzerinden sayılır; `MAX_FAILED_ATTEMPTS` eşiği aşıldığında hesap `RATE_LIMIT_WINDOW` saniye süreyle bloke edilir.
+**Guest VLAN Fallback:** Tanınmayan MAC adresleri veya yetkilendirme profili bulunmayan cihazlar otomatik olarak guest VLAN'a (varsayılan VLAN 30) yönlendirilir.
+
+Ardışık başarısız girişler Redis üzerinden sayılır; `MAX_FAILED_ATTEMPTS` eşiği aşıldığında hesap `RATE_LIMIT_WINDOW` saniye süreyle bloke edilir. Redis erişilemez durumdaysa kimlik doğrulama engellenmez (graceful degradation).
 
 ## Kurulum
 
@@ -60,7 +62,15 @@ API dokümantasyonu: `http://localhost:8000/docs`
 
 ## Test
 
-Sistem ayağa kalktığında `seed.py` aracılığıyla test verileri otomatik yüklenir.
+Sistem ayağa kalktığında `seed.py` aracılığıyla test verileri otomatik yüklenir (`SEED_ENABLED=true` olmalıdır).
+
+### Unit Testler
+
+```bash
+docker compose exec api pytest test_models.py -v
+```
+
+19 test: `is_mac_address`, `build_vlan_response` ve IP validasyonu kapsar.
 
 ### PAP Doğrulama
 
@@ -73,11 +83,22 @@ Beklenen: `Access-Accept` + VLAN 10 (`Tunnel-Private-Group-Id = 10`)
 ### MAB Doğrulama
 
 ```bash
-echo 'User-Name="AA:BB:CC:DD:EE:FF", Calling-Station-Id="AA:BB:CC:DD:EE:FF", NAS-IP-Address="127.0.0.1"' \
+echo 'User-Name="AA:BB:CC:DD:EE:FF", User-Password="AA:BB:CC:DD:EE:FF", Calling-Station-Id="AA:BB:CC:DD:EE:FF", NAS-IP-Address="127.0.0.1"' \
   | docker compose exec -T freeradius radclient localhost auth testing123
 ```
 
 Beklenen: `Access-Accept` + VLAN 20
+
+> **Not:** `User-Password` attribute'u gereklidir. FreeRADIUS authenticate aşamasına geçebilmesi için bu alanı bekler; MAB'da değeri MAC adresinin kendisidir.
+
+### Guest VLAN Fallback
+
+```bash
+echo 'User-Name="11:22:33:44:55:66", User-Password="11:22:33:44:55:66", Calling-Station-Id="11:22:33:44:55:66", NAS-IP-Address="127.0.0.1"' \
+  | docker compose exec -T freeradius radclient localhost auth testing123
+```
+
+Beklenen: `Access-Accept` + VLAN 30 (tanınmayan MAC → guest VLAN)
 
 ### Rate Limit
 
@@ -107,6 +128,29 @@ echo 'Acct-Session-Id="TEST-123", User-Name="admin", Acct-Status-Type="Stop", Ac
 
 Start sonrası `/sessions/active` üzerinde oturum görünür. Stop sonrası Redis'ten düşer, `/sessions/history` üzerinde nihai süreleriyle kayıtlı kalır.
 
+### Orphan Accounting
+
+Daha önce Start gönderilmemiş bir oturum için doğrudan Stop gönderildiğinde, sistem kaydı yine de oluşturur:
+
+```bash
+echo 'Acct-Session-Id="ORPHAN-999", User-Name="admin", Acct-Status-Type="Stop", Acct-Session-Time=120, NAS-IP-Address="127.0.0.1"' \
+  | docker compose exec -T freeradius radclient localhost acct testing123
+```
+
+Beklenen: Accounting-Response + API loglarında `WARNING — Orphan accounting stop` kaydı.
+
+## Logging ve Graceful Shutdown
+
+Uygulama merkezi logging yapılandırması kullanır. Tüm modüller `nac.*` hiyerarşisinde loglar üretir:
+
+```
+2025-01-15 10:30:00 [INFO] nac: NAC Policy Engine başlatılıyor...
+2025-01-15 10:30:01 [INFO] nac.auth: PAP doğrulama başarılı: admin
+2025-01-15 10:30:02 [WARNING] nac.accounting: Orphan accounting stop: session=ORPHAN-999
+```
+
+`docker compose down` sırasında PostgreSQL bağlantı havuzu ve Redis bağlantısı düzgün şekilde kapatılır (graceful shutdown).
+
 ## Ortam Değişkenleri
 
 `.env.example` dosyasını kopyalayarak düzenleyin:
@@ -119,4 +163,11 @@ REDIS_PASSWORD=
 RADIUS_SECRET=
 MAX_FAILED_ATTEMPTS=5
 RATE_LIMIT_WINDOW=300
+SEED_ENABLED=true
 ```
+
+| Değişken | Açıklama | Varsayılan |
+|---|---|---|
+| `SEED_ENABLED` | Test verilerinin otomatik yüklenmesi | `true` |
+| `MAX_FAILED_ATTEMPTS` | Rate limit tetikleme eşiği | `5` |
+| `RATE_LIMIT_WINDOW` | Blokaj süresi (saniye) | `300` |
