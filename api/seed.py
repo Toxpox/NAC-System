@@ -22,7 +22,7 @@ async def seed_data():
         emp_pass   = pwd_context.hash("EmployeePass!")
 
         # 1. PAP hesaplarının yaratılması
-        # ON CONFLICT DO NOTHING: Aynı kullanıcı adı veya id mevcutsa işlemi atlar (hata vermez)
+        # ON CONFLICT DO NOTHING: Aynı kullanıcı adı veya id mevcutsa işlemi atlar 
         await conn.execute("""
             INSERT INTO users (username, password_hash, group_name)
             VALUES 
