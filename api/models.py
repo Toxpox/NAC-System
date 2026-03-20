@@ -1,6 +1,18 @@
 import re
+from ipaddress import ip_address
 from typing import Optional
 from pydantic import BaseModel, field_validator
+
+
+def _validate_ip(v: Optional[str]) -> Optional[str]:
+    """IP adresi formatını doğrular. Boş/None değerler geçerli sayılır."""
+    if not v:
+        return v
+    try:
+        ip_address(v)
+    except ValueError:
+        raise ValueError(f"Geçersiz IP adresi: {v}")
+    return v
 
 
 class AuthRequest(BaseModel):
@@ -10,6 +22,11 @@ class AuthRequest(BaseModel):
     nas_ip: Optional[str] = None
     calling_station_id: Optional[str] = None
 
+    @field_validator("nas_ip")
+    @classmethod
+    def check_nas_ip(cls, v):
+        return _validate_ip(v)
+
 
 class AuthorizeRequest(BaseModel):
     # Yetkilendirme (Authorize) isteği için kullanılacak model
@@ -17,13 +34,18 @@ class AuthorizeRequest(BaseModel):
     nas_ip: Optional[str] = None
     calling_station_id: Optional[str] = None
 
+    @field_validator("nas_ip")
+    @classmethod
+    def check_nas_ip(cls, v):
+        return _validate_ip(v)
+
 
 class AccountingRequest(BaseModel):
     # Hesap tutma (Accounting) işlemleri için FreeRADIUS'tan gelen paket verilerini tanımlar
     username: str
     session_id: str
     status_type: str
-    
+
     # FreeRADIUS boş string olarak ("") yollayabildiği için Optional[str | int] yapısıyla hataları engelliyoruz.
     session_time: Optional[str | int] = 0
     input_octets: Optional[str | int] = 0
@@ -33,6 +55,11 @@ class AccountingRequest(BaseModel):
     calling_station_id: Optional[str] = None
     nas_port_id: Optional[str] = None
     terminate_cause: Optional[str] = None
+
+    @field_validator("nas_ip", "framed_ip")
+    @classmethod
+    def check_ips(cls, v):
+        return _validate_ip(v)
 
 
 class UserCreate(BaseModel):
