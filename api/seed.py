@@ -1,11 +1,19 @@
+import os
+import logging
 from passlib.context import CryptContext
 from database import get_db_pool
+
+logger = logging.getLogger("nac.seed")
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 async def seed_data():
     # Uygulama başlangıcında otomatik oluşturulacak deneme kayıtları (Seed)
+    # Üretim ortamında SEED_ENABLED=false ile devre dışı bırakılabilir
+    if os.getenv("SEED_ENABLED", "true").lower() != "true":
+        logger.info("Seed devre dışı (SEED_ENABLED != true)")
+        return
     pool = await get_db_pool()
     async with pool.acquire() as conn:
         
@@ -40,4 +48,4 @@ async def seed_data():
             ON CONFLICT (mac_address) DO NOTHING
         """)
 
-        print("Örnek veriler içeri eklendi veya zaten mevcut.")
+        logger.info("Örnek veriler içeri eklendi veya zaten mevcut.")

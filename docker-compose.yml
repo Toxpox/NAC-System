@@ -62,6 +62,7 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       MAX_FAILED_ATTEMPTS: ${MAX_FAILED_ATTEMPTS}
       RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW}
+      SEED_ENABLED: ${SEED_ENABLED:-true}
     ports:
       - "8000:8000"
     depends_on:
