@@ -1,6 +1,9 @@
 import os
+import logging
 from typing import Optional
 import asyncpg
+
+logger = logging.getLogger("nac.database")
 
 _pool: Optional[asyncpg.Pool] = None
 
@@ -93,3 +96,12 @@ async def create_tables():
         ('guest', 30, 'Misafir ve Izole Edilmis VLAN')
         ON CONFLICT DO NOTHING;
         ''')
+
+
+async def close_db_pool():
+    # Uygulama kapanırken PostgreSQL bağlantı havuzunu düzgünce kapatır — orphan connection'ları önler
+    global _pool
+    if _pool and not _pool._closed:
+        await _pool.close()
+        logger.info("PostgreSQL bağlantı havuzu kapatıldı.")
+        _pool = None

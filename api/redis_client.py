@@ -1,7 +1,10 @@
 import json
 import os
+import logging
 from typing import Optional
 import redis.asyncio as aioredis
+
+logger = logging.getLogger("nac.redis")
 
 # Global redis bağlantı nesnesi (Singleton)
 _redis: Optional[aioredis.Redis] = None
@@ -83,3 +86,12 @@ async def get_all_sessions() -> list:
         if raw:
             sessions.append(json.loads(raw))
     return sessions
+
+
+async def close_redis():
+    # Uygulama kapanırken Redis bağlantısını düzgünce kapatır
+    global _redis
+    if _redis is not None:
+        await _redis.close()
+        logger.info("Redis bağlantısı kapatıldı.")
+        _redis = None
