@@ -4,18 +4,10 @@ RADIUS protokolünü modern bir REST API arka ucu ile birleştiren modüler bir 
 
 ## Mimari
 
-```
-[Switch / AP / NAS]
-        │  RADIUS (UDP 1812/1813)
-        ▼
-  [FreeRADIUS 3.2]
-        │  rlm_rest (HTTP/JSON)
-        ▼
-  [FastAPI Policy Engine]
-      │           │
-      ▼           ▼
-[PostgreSQL]   [Redis]
-```
+<p align="center">
+  <img src="img/schema.png"/>
+</p>
+
 
 | Bileşen | Görev |
 |---|---|
